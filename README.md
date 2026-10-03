@@ -73,7 +73,7 @@ git commit -m "Describe your change"
 git push origin arena/budgetbasket-4899890-recovery
 ```
 
-A GitHub Pages workflow is included for `https://dfgtghu556-ops.github.io/grocery-/`. For the first deployment, open the repository’s **Settings → Pages**, choose **GitHub Actions** as the build/deployment source, and make sure Actions are enabled. The workflow attempts deployment after a push to the branch. This repository is private; GitHub Pages availability for private repositories depends on the account plan. Until the first Pages workflow completes successfully, use the Arena preview or run Vite locally instead.
+The configured GitHub Pages URL is `https://dfgtghu556-ops.github.io/grocery-/`; it was verified live after a successful Pages workflow deployment. The repository’s **Settings → Pages** source is **GitHub Actions**. This repository is private, so Pages availability depends on the account plan. The `github-pages` environment currently allows deployments from `main` and `arena/budgetbasket-4899890-recovery`; add another branch to that environment’s deployment allowlist before expecting Pages deployments from it.
 
 Use your normal GitHub authentication method; never put access tokens or passwords in source files or commit history.
 
