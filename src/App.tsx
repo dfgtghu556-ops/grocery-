@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
 import {
   Apple,
   ArrowLeft,
@@ -22,6 +24,8 @@ import {
   ExternalLink,
   History,
   MapPin,
+  Moon,
+  Monitor,
   Home,
   Info,
   Leaf,
@@ -37,6 +41,7 @@ import {
   ShoppingCart,
   SlidersHorizontal,
   Sparkles,
+  Sun,
   Sprout,
   Store,
   Target,
@@ -47,9 +52,12 @@ import {
   X,
 } from 'lucide-react';
 import { categories, defaultState, receiptSummaries } from './data';
+import { householdCatalog, householdCatalogGroups, type HouseholdCatalogEntry } from './catalog';
 import type { AppState, InventoryItem, OnlinePriceOffer, Page, Priority, ShoppingItem, Source } from './types';
 
 const STORAGE_KEY = 'budgetbasket-plan-v2';
+const THEME_KEY = 'budgetbasket-theme-v1';
+type ThemePreference = 'system' | 'light' | 'dark';
 
 const money = (amount: number) =>
   new Intl.NumberFormat('en-IN', {
@@ -88,6 +96,14 @@ function onlineSearchUrl(store: string, query: string): string {
   return (onlineStores.find((entry) => entry.name === store) ?? onlineStores[0]).search(query);
 }
 
+function openRetailerSearch(url: string): void {
+  if (Capacitor.isNativePlatform()) {
+    void Browser.open({ url }).catch(() => { window.open(url, '_blank', 'noopener,noreferrer'); });
+    return;
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 function normalizeOffer(offer: OnlinePriceOffer): { rate: number; unit: string } {
   if (offer.packUnit === 'g') return { rate: offer.price / (offer.packQuantity / 1000), unit: 'kg' };
   if (offer.packUnit === 'ml') return { rate: offer.price / (offer.packQuantity / 1000), unit: 'L' };
@@ -124,6 +140,16 @@ const pageCopy: Record<Page, { title: string; kicker: string }> = {
 function shouldShowTour(): boolean {
   if (typeof window === 'undefined') return false;
   try { return window.localStorage.getItem('budgetbasket-tour-complete-v1') !== 'true'; } catch { return true; }
+}
+
+function loadThemePreference(): ThemePreference {
+  if (typeof window === 'undefined') return 'system';
+  try {
+    const saved = window.localStorage.getItem(THEME_KEY);
+    return saved === 'light' || saved === 'dark' ? saved : 'system';
+  } catch {
+    return 'system';
+  }
 }
 
 function freshDefaultState(): AppState {
@@ -178,7 +204,7 @@ function getTotals(state: AppState) {
 function budgetGroup(category: string): string {
   if (category === 'Vegetables' || category === 'Fruits') return 'Fresh produce';
   if (category === 'Personal care') return 'Personal care';
-  if (category === 'Cleaning' || category === 'Household') return 'Household';
+  if (['Cleaning', 'Household', 'Baby & child', 'Pet care', 'Home maintenance', 'First aid'].includes(category)) return 'Household';
   return 'Food';
 }
 
@@ -268,8 +294,10 @@ function getSuggestions(state: AppState): Suggestion[] {
 
 function App() {
   const [data, setData] = useState<AppState>(loadSavedState);
+  const [themePreference, setThemePreference] = useState<ThemePreference>(loadThemePreference);
   const [page, setPage] = useState<Page>('home');
   const [addItemOpen, setAddItemOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const [editItem, setEditItem] = useState<ShoppingItem | null>(null);
   const [optimizerOpen, setOptimizerOpen] = useState(false);
   const [receiptsOpen, setReceiptsOpen] = useState(false);
@@ -289,10 +317,33 @@ function App() {
   const remaining = data.budget - totals.planned;
   const progress = data.budget > 0 ? (totals.planned / data.budget) * 100 : 0;
   const spendCap = data.budget * (1 - data.bufferPercent / 100);
+  const unpricedActiveCount = data.items.filter((item) => item.source !== 'remove' && item.priceNeedsReview).length;
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyTheme = () => {
+      const dark = themePreference === 'dark' || (themePreference === 'system' && media.matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0d1510' : '#f5f7f4');
+    };
+    const savePreference = () => {
+      try {
+        if (themePreference === 'system') window.localStorage.removeItem(THEME_KEY);
+        else window.localStorage.setItem(THEME_KEY, themePreference);
+      } catch {
+        setToast('Theme preference could not be saved on this device.');
+      }
+    };
+    applyTheme();
+    savePreference();
+    media.addEventListener('change', applyTheme);
+    return () => media.removeEventListener('change', applyTheme);
+  }, [themePreference]);
 
   useEffect(() => {
     const online = () => setIsOnline(true);
@@ -345,7 +396,7 @@ function App() {
 
   const saveItem = (nextItem: ShoppingItem) => {
     const exists = data.items.some((item) => item.id === nextItem.id && nextItem.id !== 'draft-item');
-    const savedItem = { ...nextItem, id: exists ? nextItem.id : `item-${Date.now()}` };
+    const savedItem = { ...nextItem, id: exists ? nextItem.id : `item-${Date.now()}`, priceNeedsReview: nextItem.estimatedPrice <= 0 };
     setData((current) => ({
       ...current,
       items: exists
@@ -356,6 +407,38 @@ function App() {
     setEditItem(null);
     setToast(editItem ? 'Item details updated.' : `Added to your ${data.month} plan.`);
     if (savedItem.source === 'online' && (!editItem || editItem.source !== 'online')) setOnlineSearchItem(savedItem);
+  };
+
+  const addCatalogItems = (selectedEntries: HouseholdCatalogEntry[]) => {
+    const existingNames = new Set(data.items.map((item) => item.name.trim().toLowerCase()));
+    const existingCatalogIds = new Set(data.items.map((item) => item.catalogId).filter(Boolean));
+    const additions = selectedEntries.filter((entry) => !existingNames.has(entry.name.trim().toLowerCase()) && !existingCatalogIds.has(entry.id));
+    if (!additions.length) {
+      setCatalogOpen(false);
+      setToast('Those items are already in your plan.');
+      return;
+    }
+    const newItems: ShoppingItem[] = additions.map((entry) => ({
+      id: `catalog-${entry.id}`,
+      catalogId: entry.id,
+      name: entry.name,
+      category: entry.category,
+      quantity: entry.quantity,
+      unit: entry.unit,
+      priority: entry.priority,
+      source: 'other',
+      estimatedPrice: 0,
+      priceNeedsReview: true,
+      checked: false,
+      frequencyMonths: entry.frequencyMonths,
+    }));
+    setData((current) => {
+      const currentNames = new Set(current.items.map((item) => item.name.trim().toLowerCase()));
+      const uniqueItems = newItems.filter((item) => !currentNames.has(item.name.trim().toLowerCase()) && !current.items.some((existing) => existing.catalogId === item.catalogId));
+      return uniqueItems.length ? { ...current, items: [...current.items, ...uniqueItems] } : current;
+    });
+    setCatalogOpen(false);
+    setToast(`${additions.length} selected items added. Set your local prices before relying on the budget total.`);
   };
 
   const saveOnlineOffer = (itemId: string, offer: OnlinePriceOffer) => {
@@ -475,6 +558,7 @@ function App() {
         onToggleMode={() => setShoppingMode((mode) => !mode)}
         onPatch={patchItem}
         onAdd={startAddItem}
+        onCatalog={() => setCatalogOpen(true)}
         onEdit={(item) => { setEditItem(item); setAddItemOpen(true); }}
         onOnlineSearch={(item) => setOnlineSearchItem(item)}
         onBulkSource={(ids, source) => {
@@ -508,6 +592,8 @@ function App() {
     }
     return <SettingsPage
       data={data}
+      themePreference={themePreference}
+      onTheme={setThemePreference}
       onBudget={(budget) => setData((current) => ({ ...current, budget }))}
       onBuffer={(bufferPercent) => setData((current) => ({ ...current, bufferPercent }))}
       onHousehold={(patch) => setData((current) => ({ ...current, household: { ...current.household, ...patch } }))}
@@ -539,6 +625,14 @@ function App() {
             <span className="month-label"><CalendarDays size={14} /> {data.month}</span>
           </div>
           <div className="topbar-actions">
+            <button
+              className="theme-toggle-button"
+              onClick={() => setThemePreference(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark')}
+              aria-label={`Switch to ${document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'} mode`}
+              title={`Switch to ${document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {document.documentElement.dataset.theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
             <button className="tour-help-button" onClick={() => setTourOpen(true)} aria-label="Open app guide"><CircleHelp size={17} /></button>
             <span className={`sync-indicator ${isOnline ? '' : 'sync-offline'}`}>
               {isOnline ? <Cloud size={15} /> : <CloudOff size={15} />}
@@ -550,6 +644,7 @@ function App() {
 
         <main className="page-content">
           <div className="page-kicker">{copy.kicker}</div>
+          {page !== 'shopping' && unpricedActiveCount > 0 && <button className="unpriced-global-warning" onClick={() => navigate('shopping')}><BadgeIndianRupee size={15} /><span>{unpricedActiveCount} household {unpricedActiveCount === 1 ? 'item still needs a price' : 'items still need prices'}. They are not reflected in the budget totals.</span><strong>Review</strong></button>}
           {renderPage()}
           <footer className="app-footer">
             <span>BudgetBasket · made for a calmer month</span>
@@ -565,6 +660,7 @@ function App() {
         onSave={saveItem}
         onDelete={editItem ? () => deleteItem(editItem.id) : undefined}
       />}
+      {catalogOpen && <HouseholdCatalogModal existingItems={data.items} onAdd={addCatalogItems} onClose={() => setCatalogOpen(false)} />}
       {optimizerOpen && <OptimizerModal
         planned={totals.planned}
         budget={data.budget}
@@ -850,6 +946,7 @@ function ShoppingPage({
   onToggleMode,
   onPatch,
   onAdd,
+  onCatalog,
   onEdit,
   onOnlineSearch,
   onBulkSource,
@@ -865,6 +962,7 @@ function ShoppingPage({
   onToggleMode: () => void;
   onPatch: (id: string, patch: Partial<ShoppingItem>) => void;
   onAdd: () => void;
+  onCatalog: () => void;
   onEdit: (item: ShoppingItem) => void;
   onOnlineSearch: (item: ShoppingItem) => void;
   onBulkSource: (ids: string[], source: Source) => void;
@@ -872,6 +970,7 @@ function ShoppingPage({
   const [manageMode, setManageMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const active = items.filter((item) => item.source !== 'remove');
+  const unpricedCount = active.filter((item) => item.priceNeedsReview).length;
   const shown = items.filter((item) => {
     if (shoppingMode && item.checked) return false;
     if (filter !== 'all' && item.source !== filter) return false;
@@ -930,11 +1029,12 @@ function ShoppingPage({
         <button className={`source-summary source-summary-other ${filter === 'other' ? 'selected' : ''}`} onClick={() => onFilter(filter === 'other' ? 'all' : 'other')}><span className="source-summary-icon"><Info size={17} /></span><span><strong>{counts.other}</strong><small>Source to review</small></span><span className="source-summary-total">{money(totals.other)}</span></button>
         <button className={`source-summary source-summary-remove ${filter === 'remove' ? 'selected' : ''}`} onClick={() => onFilter(filter === 'remove' ? 'all' : 'remove')}><span className="source-summary-icon"><X size={17} /></span><span><strong>{counts.remove}</strong><small>Discontinued</small></span><span className="source-summary-total">This month</span></button>
       </div>
+      {unpricedCount > 0 && <div className="unpriced-warning"><BadgeIndianRupee size={16} /><span><strong>{unpricedCount} selected {unpricedCount === 1 ? 'item needs' : 'items need'} a price.</strong> They are not included in your budget total yet. Add a local estimate by selecting “Set price” on a row.</span></div>}
 
       <section className="card list-card">
-        <div className="list-card-head">
+          <div className="list-card-head">
           <div><h2>Your household basket</h2><p>{active.length} planned items <span className="dot-separator">·</span> {moneyPrecise(totals.planned)} monthly estimate from last-paid prices</p></div>
-          <button className="button button-primary button-add-small" onClick={onAdd}><Plus size={16} /> Add item</button>
+          <div className="list-card-actions"><button className="button button-soft button-add-small" onClick={onCatalog}><Boxes size={15} /> Browse essentials</button><button className="button button-primary button-add-small" onClick={onAdd}><Plus size={16} /> Add item</button></div>
         </div>
         {manageMode && <div className="bulk-action-bar"><div className="bulk-selection-count"><strong>{selectedIds.length}</strong><span>{selectedIds.length === 1 ? 'item selected' : 'items selected'}</span></div><div className="bulk-action-buttons"><button className="button button-outline button-small" disabled={!selectedIds.length} onClick={() => applyBulkSource('other')}>Keep in plan</button><button className="button button-danger-soft button-small" disabled={!selectedIds.length} onClick={() => applyBulkSource('remove')}>Discontinue selected <X size={14} /></button></div></div>}
         <div className="list-toolbar">
@@ -967,6 +1067,7 @@ function ShoppingItemRow({ item, onPatch, onEdit, onOnlineSearch, manageMode, se
         <div className="item-title-line"><strong>{item.name}</strong><span className={`priority-pill ${priorityDetails[item.priority].className}`}>{priorityDetails[item.priority].label}</span></div>
         <div className="item-subline"><span>{numberFormat(item.quantity)} {item.unit}</span><i /> <span>{item.category}</span>{item.frequencyMonths > 1 && <><i /><span>Every {item.frequencyMonths} months</span></>}{item.brand && <><i /><span>{item.brand}</span></>}{item.receiptLabel && <><i /><span>{item.receiptLabel}</span></>}</div>
         {item.reviewRequired && <button className="review-item-link" onClick={() => onEdit(item)}><Info size={12} /> Check receipt name</button>}
+        {item.priceNeedsReview && <button className="price-needed-link" onClick={() => onEdit(item)}><BadgeIndianRupee size={12} /> Set price before budgeting</button>}
         {item.checked && <label className="actual-price-field"><span>Actual paid</span><span className="actual-input-wrap"><b>₹</b><input type="number" min="0" step="0.01" value={item.actualPrice ?? ''} placeholder={item.estimatedPrice.toFixed(2)} onChange={(event) => onPatch(item.id, { actualPrice: event.target.value === '' ? undefined : Number(event.target.value) })} /></span></label>}
         {item.checked && item.actualPrice !== undefined && <span className={`actual-variance ${item.estimatedPrice >= item.actualPrice ? 'variance-saved' : 'variance-over'}`}>{item.estimatedPrice >= item.actualPrice ? `${moneyPrecise(item.estimatedPrice - item.actualPrice)} under estimate` : `${moneyPrecise(item.actualPrice - item.estimatedPrice)} over estimate`}</span>}
       </div>
@@ -980,7 +1081,7 @@ function ShoppingItemRow({ item, onPatch, onEdit, onOnlineSearch, manageMode, se
         </label>
         {item.source === 'online' && <button className="online-search-link" onClick={() => onOnlineSearch(item)}><Search size={11} /> Find online</button>}
       </div>
-      <div className="item-price-block"><strong>{moneyPrecise(monthlyPrice(item))}</strong><span>{item.frequencyMonths > 1 ? 'monthly eq.' : item.receiptId ? 'last paid' : 'estimate'}</span></div>
+      <div className={`item-price-block ${item.priceNeedsReview ? 'item-price-missing' : ''}`}><strong>{item.priceNeedsReview ? '—' : moneyPrecise(monthlyPrice(item))}</strong><span>{item.priceNeedsReview ? 'price needed' : item.frequencyMonths > 1 ? 'monthly eq.' : item.receiptId ? 'last paid' : 'estimate'}</span></div>
       <button className="row-edit-button" onClick={() => onEdit(item)} aria-label={`Edit ${item.name}`}><Pencil size={15} /></button>
     </div>
   );
@@ -1112,8 +1213,10 @@ function InventoryPage({ inventory, items, onUpdate, onAdd, onApply }: { invento
   );
 }
 
-function SettingsPage({ data, onBudget, onBuffer, onHousehold, onRules, onCategoryBudgets, onLocation, onTour, onReset }: {
+function SettingsPage({ data, themePreference, onTheme, onBudget, onBuffer, onHousehold, onRules, onCategoryBudgets, onLocation, onTour, onReset }: {
   data: AppState;
+  themePreference: ThemePreference;
+  onTheme: (theme: ThemePreference) => void;
   onBudget: (budget: number) => void;
   onBuffer: (bufferPercent: number) => void;
   onHousehold: (patch: Partial<AppState['household']>) => void;
@@ -1135,6 +1238,20 @@ function SettingsPage({ data, onBudget, onBuffer, onHousehold, onRules, onCatego
       <PageHeading title="A plan that fits your home" description="Set your household size, monthly limit and the rules your shopping plan should respect." />
       <div className="settings-layout">
         <div className="settings-main">
+          <section className="card settings-card appearance-card">
+            <div className="settings-section-heading"><span className="settings-icon lilac-soft"><Sun size={18} /></span><div><h2>Appearance</h2><p>Choose a comfortable look for this device.</p></div></div>
+            <div className="theme-options" role="group" aria-label="Color theme">
+              {([
+                { value: 'system', label: 'System', icon: Monitor },
+                { value: 'light', label: 'Light', icon: Sun },
+                { value: 'dark', label: 'Dark', icon: Moon },
+              ] as const).map(({ value, label, icon: Icon }) => (
+                <button key={value} className={`theme-option${themePreference === value ? ' selected' : ''}`} onClick={() => onTheme(value)} aria-pressed={themePreference === value}>
+                  <Icon size={15} />{label}
+                </button>
+              ))}
+            </div>
+          </section>
           <section className="card settings-card">
             <div className="settings-section-heading"><span className="settings-icon green-soft"><Home size={18} /></span><div><h2>Household setup</h2><p>Used to personalize quantities and monthly needs.</p></div></div>
             <div className="settings-field-grid">
@@ -1209,6 +1326,7 @@ function ItemModal({ initial, onClose, onSave, onDelete }: { initial: ShoppingIt
     <form className="dialog item-dialog" onSubmit={submit}>
       <div className="dialog-header"><div><span className="dialog-kicker">MONTHLY SHOPPING PLAN</span><h2>{initial ? 'Edit item' : 'Add an item'}</h2><p>Set what you need and where you plan to buy it.</p></div><button className="icon-button" type="button" onClick={onClose} aria-label="Close dialog"><X size={19} /></button></div>
       {draft.reviewRequired && <div className="receipt-review-alert"><Info size={15} /><span>Some wording was transcribed from a blurry receipt photo. Check the item name and quantity before relying on it.</span><button type="button" onClick={() => change('reviewRequired', false)}>Mark reviewed</button></div>}
+      {draft.priceNeedsReview && <div className="catalog-price-note"><BadgeIndianRupee size={15} /><span>Enter a current price you checked locally. This item’s estimate is blank so it will not affect your budget until you set one.</span></div>}
       <div className="dialog-fields">
         <label className="form-field full-field"><span>Item name</span><input autoFocus value={draft.name} onChange={(event) => change('name', event.target.value)} placeholder="e.g. Toor dal" required /></label>
         <label className="form-field"><span>Category</span><select value={draft.category} onChange={(event) => change('category', event.target.value)}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
@@ -1284,11 +1402,46 @@ function OptimizerModal({ planned, budget, spendCap, remaining, bufferPercent, s
   </ModalShell>;
 }
 
+function HouseholdCatalogModal({ existingItems, onAdd, onClose }: { existingItems: ShoppingItem[]; onAdd: (items: HouseholdCatalogEntry[]) => void; onClose: () => void }) {
+  const [activeGroup, setActiveGroup] = useState('All essentials');
+  const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const existingNames = new Set(existingItems.map((entry) => entry.name.trim().toLowerCase()));
+  const existingCatalogIds = new Set(existingItems.map((entry) => entry.catalogId).filter(Boolean));
+  const isAdded = (entry: HouseholdCatalogEntry) => existingNames.has(entry.name.trim().toLowerCase()) || existingCatalogIds.has(entry.id);
+  const visibleEntries = householdCatalog.filter((entry) => {
+    const matchesGroup = activeGroup === 'All essentials' || entry.group === activeGroup;
+    const matchesSearch = !search.trim() || `${entry.name} ${entry.category} ${entry.group} ${entry.note ?? ''}`.toLowerCase().includes(search.trim().toLowerCase());
+    return matchesGroup && matchesSearch;
+  });
+  const availableVisible = visibleEntries.filter((entry) => !isAdded(entry));
+  const allVisibleSelected = availableVisible.length > 0 && availableVisible.every((entry) => selectedIds.includes(entry.id));
+  const toggleVisible = () => setSelectedIds((current) => allVisibleSelected ? current.filter((id) => !availableVisible.some((entry) => entry.id === id)) : [...new Set([...current, ...availableVisible.map((entry) => entry.id)])]);
+  const selectedEntries = householdCatalog.filter((entry) => selectedIds.includes(entry.id) && !isAdded(entry));
+
+  return <ModalShell onClose={onClose}>
+    <div className="dialog catalog-dialog">
+      <div className="dialog-header"><div><span className="dialog-kicker"><Boxes size={13} /> HOUSEHOLD STARTER CATALOG</span><h2>What else does your home need?</h2><p>A broad, editable checklist—not a universal prescription. Pick only the items your household actually uses.</p></div><button className="icon-button" onClick={onClose} aria-label="Close household catalog"><X size={19} /></button></div>
+      <div className="catalog-transparency-note"><Info size={15} /><span>Nothing is added until you select it. Suggested prices are intentionally blank; each selected item stays out of the budget total until you enter a price.</span></div>
+      <div className="catalog-toolbar"><label className="search-field"><Search size={15} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find an item or category" /></label><button className="catalog-select-visible" onClick={toggleVisible}>{allVisibleSelected ? 'Clear visible' : `Select visible (${availableVisible.length})`}</button></div>
+      <div className="catalog-layout">
+        <nav className="catalog-category-list" aria-label="Household catalog categories"><button className={activeGroup === 'All essentials' ? 'active' : ''} onClick={() => setActiveGroup('All essentials')}><span>All essentials</span><small>{householdCatalog.length}</small></button>{householdCatalogGroups.map((group) => <button key={group} className={activeGroup === group ? 'active' : ''} onClick={() => setActiveGroup(group)}><span>{group}</span><small>{householdCatalog.filter((entry) => entry.group === group).length}</small></button>)}</nav>
+        <div className="catalog-item-list">{visibleEntries.length ? visibleEntries.map((entry) => {
+          const added = isAdded(entry);
+          const selected = selectedIds.includes(entry.id);
+          return <label className={`catalog-item-option ${added ? 'already-added' : ''}`} key={entry.id}><input type="checkbox" checked={added || selected} disabled={added} onChange={() => setSelectedIds((current) => current.includes(entry.id) ? current.filter((id) => id !== entry.id) : [...current, entry.id])} /><span className="catalog-checkbox"><Check size={12} /></span><span className="catalog-item-copy"><strong>{entry.name}</strong><small>{entry.category} · {numberFormat(entry.quantity)} {entry.unit}{entry.frequencyMonths > 1 ? ` · every ${entry.frequencyMonths} months` : ''}{entry.note ? ` · ${entry.note}` : ''}</small></span><span className={`catalog-priority catalog-${entry.priority}`}>{added ? 'In your list' : entry.priority}</span></label>;
+        }) : <div className="catalog-empty"><Search size={19} /><strong>No catalog matches</strong><span>Try a different item name or category.</span></div>}</div>
+      </div>
+      <div className="catalog-footer"><span>{selectedEntries.length} selected · {householdCatalog.length} suggestions across {householdCatalogGroups.length} categories</span><div><button className="button button-outline" onClick={onClose}>Cancel</button><button className="button button-primary" disabled={!selectedEntries.length} onClick={() => onAdd(selectedEntries)}><Plus size={15} /> Add selected items</button></div></div>
+    </div>
+  </ModalShell>;
+}
+
 function ProductTour({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState(0);
   const steps: { eyebrow: string; title: string; body: string; takeaway: string; icon: ReactNode; color: string }[] = [
     { eyebrow: 'HOME · YOUR MONTH AT A GLANCE', title: 'Start with receipts, not a blank list.', body: 'Your two receipts are already in BudgetBasket. The home screen turns those past purchases into an editable starting point for this month.', takeaway: 'Past receipt prices are historical—not live store prices.', icon: <Home size={29} />, color: 'tour-green' },
-    { eyebrow: 'SHOPPING · REVIEW WHAT REPEATS', title: 'Keep the items you want. Discontinue the rest.', body: 'Search the imported list, correct any names flagged from the photos, set how often you buy an item, and bulk-select products to discontinue.', takeaway: 'Discontinued items stay in your receipt history; they leave this month’s budget.', icon: <ShoppingBasket size={29} />, color: 'tour-peach' },
+    { eyebrow: 'SHOPPING · REVIEW WHAT REPEATS', title: 'Keep the items you want. Discontinue the rest.', body: 'Search the receipt list, correct flagged names, or browse the categorized household catalog. Select only what your home uses; set prices before trusting the budget.', takeaway: 'Catalog suggestions are optional; nothing is added unless you choose it.', icon: <ShoppingBasket size={29} />, color: 'tour-peach' },
     { eyebrow: 'ONLINE · SEARCH NEAR YOU', title: 'JioMart is your first online search.', body: 'Choose Online on an item and BudgetBasket opens retailer searches with JioMart first by default. Add your city and PIN code in Settings, then confirm delivery on the store site.', takeaway: 'Prices and stock are not scraped live. Save a checked quote to compare sellers by unit price.', icon: <Store size={29} />, color: 'tour-blue' },
     { eyebrow: 'BUDGET · MAKE A PLAN, NOT A GUESS', title: 'Your totals update as you edit.', body: 'BudgetBasket calculates totals from quantities and prices. Set a buffer, check whether you can afford an extra purchase, and review optimizer ideas before accepting them.', takeaway: 'The optimizer suggests changes; it never silently removes essentials.', icon: <BarChart3 size={29} />, color: 'tour-lilac' },
     { eyebrow: 'INVENTORY · SHOP WITH CONFIDENCE', title: 'Check stock, shop, and record what you paid.', body: 'Enter what is already at home, approve recommended quantities, and use Shopping mode to check off items and add actual prices—even if your connection drops after the page loads.', takeaway: 'Your current plan is saved in this browser. Cloud sync is not connected yet.', icon: <Boxes size={29} />, color: 'tour-yellow' },
@@ -1392,7 +1545,7 @@ function OnlineSearchModal({ item, area, postalCode, preferredStore, onSaveOffer
 
       <section className="online-retailer-section"><div className="online-section-title"><div><h3>Search stores</h3><span>Opens retailer search results in a new tab</span></div></div><div className="retailer-search-list">{stores.map((store, index) => {
         const latest = [...(item.onlineOffers ?? [])].filter((offer) => offer.store === store.name).sort((a, b) => b.checkedAt.localeCompare(a.checkedAt))[0];
-        return <div className={`retailer-search-row ${index === 0 ? 'preferred' : ''}`} key={store.id}><span className="retailer-index">{String(index + 1).padStart(2, '0')}</span><div className="retailer-search-copy"><strong>{store.name}{index === 0 && <em>FIRST TO CHECK</em>}</strong><span>{latest ? `Last saved ${moneyPrecise(latest.price)} · ${latest.checkedAt}` : 'Check today’s price and delivery availability'}</span></div><a className="retailer-open-link" href={store.search(item.name)} target="_blank" rel="noreferrer">Search <ExternalLink size={13} /></a></div>;
+        return <div className={`retailer-search-row ${index === 0 ? 'preferred' : ''}`} key={store.id}><span className="retailer-index">{String(index + 1).padStart(2, '0')}</span><div className="retailer-search-copy"><strong>{store.name}{index === 0 && <em>FIRST TO CHECK</em>}</strong><span>{latest ? `Last saved ${moneyPrecise(latest.price)} · ${latest.checkedAt}` : 'Check today’s price and delivery availability'}</span></div><button type="button" className="retailer-open-link" aria-label={`Search ${store.name} for ${item.name}`} onClick={() => openRetailerSearch(store.search(item.name))}>Search <ExternalLink size={13} /></button></div>;
       })}</div></section>
 
       <section className="save-online-quote"><div className="online-section-title"><div><h3>Found a price? Save it</h3><span>Quotes stay on this device and are dated for comparison.</span></div></div><div className="quote-entry-grid"><label className="form-field"><span>Store</span><select value={quoteStore} onChange={(event) => setQuoteStore(event.target.value)}>{onlineStores.map((store) => <option key={store.id}>{store.name}</option>)}</select></label><label className="form-field"><span>Pack price</span><div className="input-with-prefix"><b>₹</b><input type="number" min="0.01" step="0.01" value={quotePrice} onChange={(event) => setQuotePrice(event.target.value)} placeholder="0.00" /></div></label><label className="form-field"><span>Pack size</span><input type="number" min="0.001" step="0.001" value={quoteQuantity} onChange={(event) => setQuoteQuantity(event.target.value)} /></label><label className="form-field"><span>Unit</span><select value={quoteUnit} onChange={(event) => setQuoteUnit(event.target.value as OnlinePriceOffer['packUnit'])}><option value="kg">kg</option><option value="g">g</option><option value="L">L</option><option value="ml">ml</option><option value="piece">piece</option></select></label></div>{quoteError && <span className="quote-error">{quoteError}</span>}<button className="button button-primary save-quote-button" onClick={saveQuote}><Plus size={15} /> Save checked price</button></section>

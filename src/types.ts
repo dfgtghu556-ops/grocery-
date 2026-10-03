@@ -33,6 +33,8 @@ export interface ShoppingItem {
   receiptLabel?: string;
   receiptDate?: string;
   reviewRequired?: boolean;
+  priceNeedsReview?: boolean;
+  catalogId?: string;
   onlineOffers?: OnlinePriceOffer[];
 }
 

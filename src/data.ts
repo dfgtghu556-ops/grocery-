@@ -153,5 +153,5 @@ export const defaultState: AppState = {
 };
 
 export const categories = [
-  'Grocery', 'Pulses', 'Cooking', 'Spices', 'Dairy', 'Breakfast', 'Vegetables', 'Fruits', 'Personal care', 'Cleaning', 'Household',
+  'Grocery', 'Pulses', 'Cooking', 'Spices', 'Dairy', 'Breakfast', 'Vegetables', 'Fruits', 'Personal care', 'Cleaning', 'Household', 'Baby & child', 'Pet care', 'Home maintenance', 'First aid',
 ];

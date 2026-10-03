@@ -2,11 +2,11 @@
 
 **Plan your month. Control your spending. Shop smarter.**
 
-BudgetBasket is a mobile-first household budget and shopping manager. The current plan starts with the 73 product lines transcribed from the two grocery receipts supplied for this project—there is no demo basket. The receipts do not include garlic, so garlic is not preloaded.
+BudgetBasket is a mobile-first household budget and shopping manager. The current plan starts with the 73 product lines transcribed from the two grocery receipts supplied for this project—there is no demo basket. The receipt-derived list does not include garlic. Garlic appears only as an optional starter-catalog suggestion, never as a receipt item or preselected purchase.
 
 ## Run locally
 
-Requirements: Node.js 18+ and npm.
+Requirements: Node.js 22+ and npm (Capacitor 8 requires Node.js 22 for the Android tooling).
 
 ```bash
 npm install
@@ -43,6 +43,10 @@ The project uses React, TypeScript, and Vite. Open the project folder in VS Code
 - Household, budget, buffer, category allocation and shopping-rule settings.
 - Animated, five-step first-run app tour. Skip it at any time, replay it from the help button or Settings.
 - Browser local-storage persistence. Shopping mode remains usable offline after the app has loaded.
+- Readable responsive layouts from 320px phones through desktop, with larger touch controls and Android safe-area spacing.
+- Light, dark and system appearance modes, saved on the current device and available from the top-bar quick switch or Settings.
+- Optional categorized household starter catalog. It includes pantry, pulses, produce, dairy, cleaning, kitchen, personal care, first aid, baby/child, pet and home-maintenance reminders. Nothing is added until selected; new items have no invented price and stay out of budget totals until priced.
+- Capacitor Android wrapper and GitHub Actions workflows for installable preview APKs and signed release APKs.
 
 ## Online shopping and price limitations
 
@@ -52,16 +56,43 @@ The project uses React, TypeScript, and Vite. Open the project folder in VS Code
 - You can save a price you personally checked. Quotes are dated and tagged with the configured locality for comparison by normalized unit price; they are not live feeds. Saving a quote does not automatically change the monthly estimate.
 - Confirm the final price, availability and delivery fee on the retailer's site before purchasing.
 
-## VS Code and GitHub
+## VS Code, GitHub branch, and live preview
 
-Open this folder in VS Code and use the commands above in its integrated terminal. For a fresh local copy, create an empty repository in your GitHub account and add it as `origin`; then push your working branch:
+Once pushed, the BudgetBasket code is directly usable from its feature branch without waiting for a pull request to merge. GitHub Pages deploys from `arena/budgetbasket-4899890-recovery`; the Android workflow runs on Arena feature branches (`arena/**`). Clone this branch with:
 
 ```bash
-git remote add origin https://github.com/<your-account>/<your-repository>.git
-git push -u origin <your-branch>
+git clone --branch arena/budgetbasket-4899890-recovery --single-branch https://github.com/dfgtghu556-ops/grocery-.git
+cd grocery-
+npm ci
+npm run dev
 ```
 
-For an already configured clone, check the remote with `git remote -v`, then push the branch you are working on. Use your normal GitHub authentication method; never put access tokens or passwords in source files or commit history.
+Open this folder in VS Code and run those commands in its integrated terminal. To push later edits directly to the same branch—without opening a PR—use:
+
+```bash
+git add .
+git commit -m "Describe your change"
+git push origin arena/budgetbasket-4899890-recovery
+```
+
+The configured GitHub Pages URL is `https://dfgtghu556-ops.github.io/grocery-/`; it was verified live after a successful Pages workflow deployment. The repository’s **Settings → Pages** source is **GitHub Actions**. This repository is private, so Pages availability depends on the account plan. The `github-pages` environment currently allows deployments from `main` and `arena/budgetbasket-4899890-recovery`; add another branch to that environment’s deployment allowlist before expecting Pages deployments from it.
+
+Use your normal GitHub authentication method; never put access tokens or passwords in source files or commit history.
+
+## Android APK
+
+The Android wrapper uses Capacitor 8. To build locally, install Android Studio, Android SDK Platform 36, and JDK 21, then run:
+
+```bash
+npm install
+npm run android:sync
+cd android
+./gradlew assembleDebug
+```
+
+The installable debug APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. On Windows, use `gradlew.bat assembleDebug` instead of `./gradlew`. GitHub Actions builds it after pushes to Arena feature branches; download the `budgetbasket-debug-apk` artifact from a successful **Build BudgetBasket Android APK** run, or install the `BudgetBasket-debug-preview.apk` asset from the latest GitHub Release. Enable **Install unknown apps** for the browser or file manager used to open the APK. Debug builds are signed for sideload testing, not for Play Store distribution.
+
+To publish an APK release, push a version tag such as `v0.3.0` or run **Actions → Publish BudgetBasket Android APK** with an existing tag name. The workflow always attaches an installable debug-signed preview APK and a SHA-256 checksum. To also produce a production-signed release APK, first create a private Android upload keystore and add these repository Actions secrets: `ANDROID_KEYSTORE_BASE64` (base64-encoded keystore), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Never commit or send the keystore or passwords in chat. When all four secrets are present, the workflow includes `BudgetBasket-release.apk` and publishes a full GitHub Release; without them, it publishes a prerelease containing only the debug preview. Back up the keystore securely: losing it prevents signing compatible updates. CI-generated debug keys may differ between runs, so Android may require removing an older debug preview before installing a newer one; uninstalling can erase this device's local app data.
 
 ## Scope and production deployment
 
