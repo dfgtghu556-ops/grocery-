@@ -56,12 +56,12 @@ The project uses React, TypeScript, and Vite. Open the project folder in VS Code
 
 ## VS Code, GitHub branch, and live preview
 
-The working code is pushed directly to `arena/01a0ffcb-grocery`; no pull request is required to access or check out that branch. Clone it with:
+Once pushed, the BudgetBasket code is directly usable from its feature branch without waiting for a pull request to merge. The Pages and Android workflows run on pushes to Arena feature branches (`arena/**`). Clone this branch with:
 
 ```bash
-git clone --branch arena/01a0ffcb-grocery --single-branch https://github.com/dfgtghu556-ops/grocery-.git
+git clone --branch arena/budgetbasket-4899890-recovery --single-branch https://github.com/dfgtghu556-ops/grocery-.git
 cd grocery-
-npm install
+npm ci
 npm run dev
 ```
 
@@ -70,7 +70,7 @@ Open this folder in VS Code and run those commands in its integrated terminal. T
 ```bash
 git add .
 git commit -m "Describe your change"
-git push origin arena/01a0ffcb-grocery
+git push origin arena/budgetbasket-4899890-recovery
 ```
 
 A GitHub Pages workflow is included for `https://dfgtghu556-ops.github.io/grocery-/`. For the first deployment, open the repository’s **Settings → Pages**, choose **GitHub Actions** as the build/deployment source, and make sure Actions are enabled. The workflow attempts deployment after a push to the branch. This repository is private; GitHub Pages availability for private repositories depends on the account plan. Until the first Pages workflow completes successfully, use the Arena preview or run Vite locally instead.
@@ -88,7 +88,7 @@ cd android
 ./gradlew assembleDebug
 ```
 
-The installable debug APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. On Windows, use `gradlew.bat assembleDebug` instead of `./gradlew`. A GitHub Actions workflow is configured to build after pushes to `arena/01a0ffcb-grocery` when Actions are enabled; download its `budgetbasket-debug-apk` artifact from a successful run’s **Actions → Build BudgetBasket Android APK** page. The artifact is retained for 30 days. It is a debug-signed sideload build for testing—not a release-signed Play Store package.
+The installable debug APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. On Windows, use `gradlew.bat assembleDebug` instead of `./gradlew`. A GitHub Actions workflow is configured to build after pushes to Arena feature branches when Actions are enabled; download its `budgetbasket-debug-apk` artifact from a successful run’s **Actions → Build BudgetBasket Android APK** page. The artifact is retained for 30 days. It is a debug-signed sideload build for testing—not a release-signed Play Store package.
 
 ## Scope and production deployment
 

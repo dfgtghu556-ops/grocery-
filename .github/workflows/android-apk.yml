@@ -3,7 +3,7 @@ name: Build BudgetBasket Android APK
 on:
   push:
     branches:
-      - arena/01a0ffcb-grocery
+      - 'arena/**'
   workflow_dispatch:
 
 permissions:
