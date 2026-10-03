@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f5f7f4" />
     <meta name="description" content="Plan your month. Control your spending. Shop smarter with BudgetBasket." />
+    <script>
+      try {
+        const preference = localStorage.getItem('budgetbasket-theme-v1');
+        const dark = preference === 'dark' || (preference !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        document.querySelector('meta[name="theme-color"]').content = dark ? '#0d1510' : '#f5f7f4';
+      } catch {
+        document.documentElement.dataset.theme = 'light';
+      }
+    </script>
     <title>BudgetBasket — Monthly household planner</title>
   </head>
   <body>

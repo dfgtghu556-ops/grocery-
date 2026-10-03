@@ -24,6 +24,8 @@ import {
   ExternalLink,
   History,
   MapPin,
+  Moon,
+  Monitor,
   Home,
   Info,
   Leaf,
@@ -39,6 +41,7 @@ import {
   ShoppingCart,
   SlidersHorizontal,
   Sparkles,
+  Sun,
   Sprout,
   Store,
   Target,
@@ -53,6 +56,8 @@ import { householdCatalog, householdCatalogGroups, type HouseholdCatalogEntry } 
 import type { AppState, InventoryItem, OnlinePriceOffer, Page, Priority, ShoppingItem, Source } from './types';
 
 const STORAGE_KEY = 'budgetbasket-plan-v2';
+const THEME_KEY = 'budgetbasket-theme-v1';
+type ThemePreference = 'system' | 'light' | 'dark';
 
 const money = (amount: number) =>
   new Intl.NumberFormat('en-IN', {
@@ -135,6 +140,16 @@ const pageCopy: Record<Page, { title: string; kicker: string }> = {
 function shouldShowTour(): boolean {
   if (typeof window === 'undefined') return false;
   try { return window.localStorage.getItem('budgetbasket-tour-complete-v1') !== 'true'; } catch { return true; }
+}
+
+function loadThemePreference(): ThemePreference {
+  if (typeof window === 'undefined') return 'system';
+  try {
+    const saved = window.localStorage.getItem(THEME_KEY);
+    return saved === 'light' || saved === 'dark' ? saved : 'system';
+  } catch {
+    return 'system';
+  }
 }
 
 function freshDefaultState(): AppState {
@@ -279,6 +294,7 @@ function getSuggestions(state: AppState): Suggestion[] {
 
 function App() {
   const [data, setData] = useState<AppState>(loadSavedState);
+  const [themePreference, setThemePreference] = useState<ThemePreference>(loadThemePreference);
   const [page, setPage] = useState<Page>('home');
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -306,6 +322,28 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const applyTheme = () => {
+      const dark = themePreference === 'dark' || (themePreference === 'system' && media.matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0d1510' : '#f5f7f4');
+    };
+    const savePreference = () => {
+      try {
+        if (themePreference === 'system') window.localStorage.removeItem(THEME_KEY);
+        else window.localStorage.setItem(THEME_KEY, themePreference);
+      } catch {
+        setToast('Theme preference could not be saved on this device.');
+      }
+    };
+    applyTheme();
+    savePreference();
+    media.addEventListener('change', applyTheme);
+    return () => media.removeEventListener('change', applyTheme);
+  }, [themePreference]);
 
   useEffect(() => {
     const online = () => setIsOnline(true);
@@ -554,6 +592,8 @@ function App() {
     }
     return <SettingsPage
       data={data}
+      themePreference={themePreference}
+      onTheme={setThemePreference}
       onBudget={(budget) => setData((current) => ({ ...current, budget }))}
       onBuffer={(bufferPercent) => setData((current) => ({ ...current, bufferPercent }))}
       onHousehold={(patch) => setData((current) => ({ ...current, household: { ...current.household, ...patch } }))}
@@ -585,6 +625,14 @@ function App() {
             <span className="month-label"><CalendarDays size={14} /> {data.month}</span>
           </div>
           <div className="topbar-actions">
+            <button
+              className="theme-toggle-button"
+              onClick={() => setThemePreference(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark')}
+              aria-label={`Switch to ${document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'} mode`}
+              title={`Switch to ${document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {document.documentElement.dataset.theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
             <button className="tour-help-button" onClick={() => setTourOpen(true)} aria-label="Open app guide"><CircleHelp size={17} /></button>
             <span className={`sync-indicator ${isOnline ? '' : 'sync-offline'}`}>
               {isOnline ? <Cloud size={15} /> : <CloudOff size={15} />}
@@ -1165,8 +1213,10 @@ function InventoryPage({ inventory, items, onUpdate, onAdd, onApply }: { invento
   );
 }
 
-function SettingsPage({ data, onBudget, onBuffer, onHousehold, onRules, onCategoryBudgets, onLocation, onTour, onReset }: {
+function SettingsPage({ data, themePreference, onTheme, onBudget, onBuffer, onHousehold, onRules, onCategoryBudgets, onLocation, onTour, onReset }: {
   data: AppState;
+  themePreference: ThemePreference;
+  onTheme: (theme: ThemePreference) => void;
   onBudget: (budget: number) => void;
   onBuffer: (bufferPercent: number) => void;
   onHousehold: (patch: Partial<AppState['household']>) => void;
@@ -1188,6 +1238,20 @@ function SettingsPage({ data, onBudget, onBuffer, onHousehold, onRules, onCatego
       <PageHeading title="A plan that fits your home" description="Set your household size, monthly limit and the rules your shopping plan should respect." />
       <div className="settings-layout">
         <div className="settings-main">
+          <section className="card settings-card appearance-card">
+            <div className="settings-section-heading"><span className="settings-icon lilac-soft"><Sun size={18} /></span><div><h2>Appearance</h2><p>Choose a comfortable look for this device.</p></div></div>
+            <div className="theme-options" role="group" aria-label="Color theme">
+              {([
+                { value: 'system', label: 'System', icon: Monitor },
+                { value: 'light', label: 'Light', icon: Sun },
+                { value: 'dark', label: 'Dark', icon: Moon },
+              ] as const).map(({ value, label, icon: Icon }) => (
+                <button key={value} className={`theme-option${themePreference === value ? ' selected' : ''}`} onClick={() => onTheme(value)} aria-pressed={themePreference === value}>
+                  <Icon size={15} />{label}
+                </button>
+              ))}
+            </div>
+          </section>
           <section className="card settings-card">
             <div className="settings-section-heading"><span className="settings-icon green-soft"><Home size={18} /></span><div><h2>Household setup</h2><p>Used to personalize quantities and monthly needs.</p></div></div>
             <div className="settings-field-grid">
