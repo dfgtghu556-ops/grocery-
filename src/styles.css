@@ -26,6 +26,7 @@
 
 * { box-sizing: border-box; }
 html { min-width: 320px; scroll-behavior: smooth; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--canvas); }
 button, input, select { font: inherit; }
 button { color: inherit; }
@@ -1251,4 +1252,111 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 @media (max-width: 370px) {
   .list-card-actions { justify-content: stretch; }
   .list-card-actions .button { flex: 1; padding: 0 4px; font-size: 6.5px; }
+}
+
+/* Keep the dense dashboard readable on desktop and comfortable on touch screens. */
+@media (min-width: 761px) {
+  .page-content p, .page-content small, .page-content label,
+  .modal-overlay p, .modal-overlay small, .modal-overlay label {
+    font-size: max(12px, .75em) !important;
+    line-height: 1.45;
+  }
+  .page-kicker { font-size: 10px; }
+  .page-heading p, .section-heading p, .list-card-head p { font-size: 12px; }
+  .section-heading h2, .list-card-head h2 { font-size: 15px; }
+  .item-title-line > strong { font-size: 12px; }
+  .shopping-row .item-subline { font-size: 12px; }
+  .priority-pill, .source-pill select { font-size: 10px; }
+  .item-price-block strong { font-size: 13px; }
+  .item-price-block span, .compare-link { font-size: 10px; }
+  .quick-action, .button { font-size: 12px; }
+}
+
+@media (max-width: 760px) {
+  .page-content p, .page-content small, .page-content label,
+  .modal-overlay p, .modal-overlay small, .modal-overlay label {
+    font-size: max(13px, .8125em) !important;
+    line-height: 1.45;
+  }
+  .main-column { padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
+  .page-content { padding: 18px 16px 28px; }
+  .page-heading { align-items: stretch; flex-direction: column; }
+  .heading-action { width: 100%; min-width: 0; }
+  .shopping-page-actions { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .shopping-page-actions .button { min-width: 0; min-height: 44px; padding: 0 8px; justify-content: center; font-size: 11px; white-space: normal; }
+  .page-kicker { font-size: 10px; line-height: 1.4; }
+  .page-heading { min-height: 64px; }
+  .page-heading h1 { font-size: 25px; line-height: 1.2; }
+  .page-heading p { font-size: 13px; line-height: 1.5; }
+  .heading-action .button { min-height: 44px; padding: 0 12px; font-size: 12px; }
+  .section-heading h2, .list-card-head h2 { font-size: 16px; }
+  .section-heading p, .list-card-head p { font-size: 12px; line-height: 1.45; }
+  .quick-label, .eyebrow, .hero-label, .hero-tag { font-size: 11px; }
+  .quick-action, .button, .text-button { font-size: 13px; }
+  .quick-action { min-height: 48px; }
+  .stat-text > span, .stat-text small { font-size: 11px; }
+  .stat-text strong { font-size: 16px; }
+  .shopping-row { min-height: 88px; grid-template-columns: 22px 36px minmax(0,1fr) 40px; column-gap: 8px; }
+  .shopping-row .item-title-line > strong { font-size: 14px; }
+  .shopping-row .row-edit-button { width: 40px; height: 40px; }
+  .item-check-wrap { width: 24px; height: 24px; }
+  .item-category-glyph { width: 35px; height: 35px; }
+  .item-title-line > strong { font-size: 14px; line-height: 1.35; }
+  .item-subline { font-size: 12px; line-height: 1.4; }
+  .priority-pill { padding: 4px 6px; font-size: 10px; }
+  .source-pill { min-width: 94px; height: 40px; padding: 0 8px; }
+  .source-pill select { width: 68px; font-size: 11px; }
+  .item-price-block strong { font-size: 13px; }
+  .item-price-block span { display: block; font-size: 10px; }
+  .row-edit-button { width: 40px; height: 40px; }
+  .search-field { width: 100%; height: 44px; }
+  .search-field input { font-size: 16px; }
+  .filter-chips { width: 100%; }
+  .filter-chips button { min-height: 44px; font-size: 11px; }
+  .mobile-nav { height: calc(76px + env(safe-area-inset-bottom)); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
+  .mobile-nav button { min-height: 48px; gap: 4px; }
+  .mobile-nav button span { font-size: 11px; }
+  .form-field, .dialog-fields .form-field { font-size: 12px; }
+  .form-field input, .form-field select, .dialog-fields .form-field input, .dialog-fields .form-field select { height: 44px; font-size: 16px; }
+  .dialog-header p, .dialog-fields .form-field em { font-size: 12px; line-height: 1.5; }
+  .dialog-actions .button, .dialog-actions .text-button { min-height: 44px; font-size: 12px; }
+  .modal-overlay { padding: 10px; }
+  .modal-scroll-area, .dialog { max-height: calc(100dvh - 20px); }
+  .catalog-dialog .dialog-header p,
+  .catalog-transparency-note,
+  .catalog-select-visible,
+  .catalog-category-list button,
+  .catalog-footer > span,
+  .catalog-footer .button { font-size: 12px; line-height: 1.4; }
+  .catalog-category-list { max-height: 92px; }
+  .catalog-category-list button { min-height: 40px; }
+  .catalog-item-option { min-height: 58px; }
+  .catalog-item-copy strong { font-size: 13px; }
+  .catalog-item-copy small { font-size: 11px; }
+  .catalog-priority { font-size: 10px; }
+  .history-row, .history-row > div strong { font-size: 12px; }
+  .inventory-item-name strong, .settings-section-heading h2 { font-size: 14px; }
+  .inventory-item-name small, .settings-section-heading p { font-size: 11px; }
+  .price-disclaimer, .inventory-disclaimer, .settings-disclaimer,
+  .optimizer-foot, .optimizer-modal-foot, .unpriced-warning,
+  .receipt-import-copy p { font-size: 12px; line-height: 1.5; }
+  .list-card-actions .button { min-height: 42px; padding: 0 10px; font-size: 11px; }
+  .apply-stock-button { min-height: 40px; font-size: 11px; }
+}
+
+@media (max-width: 390px) {
+  .page-content { padding-right: 13px; padding-left: 13px; }
+  .page-heading h1 { font-size: 23px; }
+  .shopping-row { grid-template-columns: 20px 32px minmax(0,1fr) 36px; column-gap: 6px; }
+  .item-category-glyph { width: 31px; height: 31px; }
+  .shopping-row .item-title-line > strong { font-size: 13px; }
+  .item-subline { font-size: 11px; }
+  .mobile-nav { padding-right: 4px; padding-left: 4px; }
+  .mobile-nav button span { font-size: 10px; }
+  .catalog-item-option { grid-template-columns: 24px minmax(0,1fr); }
+  .catalog-priority { grid-column: 2; justify-self: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

@@ -43,8 +43,9 @@ The project uses React, TypeScript, and Vite. Open the project folder in VS Code
 - Household, budget, buffer, category allocation and shopping-rule settings.
 - Animated, five-step first-run app tour. Skip it at any time, replay it from the help button or Settings.
 - Browser local-storage persistence. Shopping mode remains usable offline after the app has loaded.
+- Readable responsive layouts from 320px phones through desktop, with larger touch controls and Android safe-area spacing.
 - Optional categorized household starter catalog. It includes pantry, pulses, produce, dairy, cleaning, kitchen, personal care, first aid, baby/child, pet and home-maintenance reminders. Nothing is added until selected; new items have no invented price and stay out of budget totals until priced.
-- Capacitor Android wrapper and GitHub Actions workflow for an installable debug APK.
+- Capacitor Android wrapper and GitHub Actions workflows for installable preview APKs and signed release APKs.
 
 ## Online shopping and price limitations
 
@@ -79,7 +80,7 @@ Use your normal GitHub authentication method; never put access tokens or passwor
 
 ## Android APK
 
-The Android wrapper uses Capacitor. To build locally, install Android Studio, Android SDK Platform 36, and JDK 21, then run:
+The Android wrapper uses Capacitor 8. To build locally, install Android Studio, Android SDK Platform 36, and JDK 21, then run:
 
 ```bash
 npm install
@@ -88,7 +89,9 @@ cd android
 ./gradlew assembleDebug
 ```
 
-The installable debug APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. On Windows, use `gradlew.bat assembleDebug` instead of `./gradlew`. A GitHub Actions workflow is configured to build after pushes to Arena feature branches when Actions are enabled; download its `budgetbasket-debug-apk` artifact from a successful run’s **Actions → Build BudgetBasket Android APK** page. The artifact is retained for 30 days. It is a debug-signed sideload build for testing—not a release-signed Play Store package.
+The installable debug APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. On Windows, use `gradlew.bat assembleDebug` instead of `./gradlew`. GitHub Actions builds it after pushes to Arena feature branches; download the `budgetbasket-debug-apk` artifact from a successful **Build BudgetBasket Android APK** run, or install the `BudgetBasket-debug-preview.apk` asset from the latest GitHub Release. Enable **Install unknown apps** for the browser or file manager used to open the APK. Debug builds are signed for sideload testing, not for Play Store distribution.
+
+To publish an APK release, push a version tag such as `v0.2.0` or run **Actions → Publish BudgetBasket Android APK** with an existing tag name. The workflow always attaches an installable debug-signed preview APK and a SHA-256 checksum. To also produce a production-signed release APK, first create a private Android upload keystore and add these repository Actions secrets: `ANDROID_KEYSTORE_BASE64` (base64-encoded keystore), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Never commit or send the keystore or passwords in chat. When all four secrets are present, the workflow includes `BudgetBasket-release.apk` and publishes a full GitHub Release; without them, it publishes a prerelease containing only the debug preview. Back up the keystore securely: losing it prevents signing compatible updates. CI-generated debug keys may differ between runs, so Android may require removing an older debug preview before installing a newer one; uninstalling can erase this device's local app data.
 
 ## Scope and production deployment
 
