@@ -56,7 +56,7 @@ The project uses React, TypeScript, and Vite. Open the project folder in VS Code
 
 ## VS Code, GitHub branch, and live preview
 
-Once pushed, the BudgetBasket code is directly usable from its feature branch without waiting for a pull request to merge. The Pages and Android workflows run on pushes to Arena feature branches (`arena/**`). Clone this branch with:
+Once pushed, the BudgetBasket code is directly usable from its feature branch without waiting for a pull request to merge. GitHub Pages deploys from `arena/budgetbasket-4899890-recovery`; the Android workflow runs on Arena feature branches (`arena/**`). Clone this branch with:
 
 ```bash
 git clone --branch arena/budgetbasket-4899890-recovery --single-branch https://github.com/dfgtghu556-ops/grocery-.git

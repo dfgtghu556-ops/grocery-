@@ -3,7 +3,7 @@ name: Deploy BudgetBasket preview
 on:
   push:
     branches:
-      - 'arena/**'
+      - arena/budgetbasket-4899890-recovery
   workflow_dispatch:
 
 permissions:
